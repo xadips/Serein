@@ -4,6 +4,23 @@ Recent synthetic/offline measurements are workload-specific. They do not establi
 performance, universal device results or application-wide memory bounds. The raw PR screenshot,
 log and per-run evidence archive has been removed; the summaries below retain the useful results.
 
+## Voice channel double-click join — November 6, 2026 (PR #907)
+
+Compared base `8b3cd52d` with double-click join `d834fd17` on Arch Linux (kernel 7.2.14-zen1,
+Ryzen 9 9950X3D, 31 GiB RAM) using Rust 1.98.1 and `cargo xtask package --format arch` (voice
+included, demo disabled). Each revision was built in its own worktree and target directory; both
+packages passed the packager's Arch smoke check. Installed tree is the sum of the 245 payload
+files listed in each package.
+
+| Package metric | Baseline | After | Delta |
+| --- | ---: | ---: | ---: |
+| `serein` executable | 93,608,272 B | 93,608,656 B | +384 B (+0.00041%) |
+| Installed tree | 98,307,504 B | 98,307,888 B | +384 B (+0.00039%) |
+| `.pkg.tar.zst` | 54,965,487 B | 54,968,967 B | +3,480 B (+0.0063%) |
+
+The change adds one pending channel field and a double-click check on voice rows that are
+already drawn; CPU, memory, startup and frame latency were not measured.
+
 ## Window drags on Windows — November 5, 2026
 
 Review follow-up: the measurements below describe the original `1f664628` implementation.
