@@ -2720,10 +2720,10 @@ mod tests {
 		};
 		let ctx = egui::Context::default();
 		let mut time = 0.0;
-		// Returns the channel row picked, call commands and row positions after one frame.
+		// Returns the voice commands and row positions after one sidebar frame.
 		let mut frame = |view: &mut MessagingUi, state: &mut State, step, events| {
 			time += step;
-			let mut picked = None;
+			let mut commands = Vec::new();
 			let output = ctx.run_ui(
 				egui::RawInput {
 					screen_rect: Some(egui::Rect::from_min_size(
@@ -2734,27 +2734,25 @@ mod tests {
 					events,
 					..Default::default()
 				},
-				|ui| picked = view.channel_list(ui, state),
+				|ui| view.sidebar(ui, state, "", &mut commands),
 			);
 			let mut rows = BTreeMap::new();
 			for clipped in &output.shapes {
 				walk(&clipped.shape, &mut rows);
 			}
 			output.drop_without_applying_deltas();
-			let mut commands = Vec::new();
-			view.apply_voice_join(state, &mut commands);
-			(picked, commands, rows)
+			commands.retain(|command| matches!(command, client_core::Command::Voice(_)));
+			(commands, rows)
 		};
 		let mut click = |view: &mut MessagingUi, state: &mut State, name: &str, times| {
 			// Separate scenarios fall outside egui's double-click window.
-			let (_, _, rows) = frame(view, state, 1.0, vec![]);
+			let (_, rows) = frame(view, state, 1.0, vec![]);
 			let pos = rows[name];
 			frame(view, state, 0.05, vec![egui::Event::PointerMoved(pos)]);
-			let mut picked = None;
 			let mut commands = Vec::new();
 			for _ in 0..times {
 				for pressed in [true, false] {
-					let (row, sent, _) = frame(
+					let (sent, _) = frame(
 						view,
 						state,
 						0.05,
@@ -2765,36 +2763,36 @@ mod tests {
 							modifiers: egui::Modifiers::NONE,
 						}],
 					);
-					picked = row.or(picked);
 					commands.extend(sent);
 				}
 			}
-			(picked, commands)
+			commands
 		};
 
 		// A single click opens the channel without touching the call.
-		let (picked, commands) = click(&mut view, &mut state, "Quiet room", 1);
-		assert_eq!(picked, Some(Id(26)));
+		let commands = click(&mut view, &mut state, "Quiet room", 1);
+		assert_eq!(state.selected, Some(Id(26)));
 		assert!(commands.is_empty() && view.voice_switch.is_none());
 
 		// From another call, a double-click still waits for the switch confirmation.
-		let (picked, commands) = click(&mut view, &mut state, "Quiet room", 2);
-		assert_eq!(picked, Some(Id(26)));
+		let commands = click(&mut view, &mut state, "Quiet room", 2);
 		assert!(commands.is_empty() && view.voice_switch.is_some());
 		view.voice_switch = None;
 
 		// Double-clicking the current call's channel is a no-op.
-		let (_, commands) = click(&mut view, &mut state, "Room 3,5", 2);
+		let commands = click(&mut view, &mut state, "Room 3,5", 2);
+		assert_eq!(state.selected, Some(Id(25)));
 		assert!(commands.is_empty() && view.voice_switch.is_none());
 
 		// Unavailable voice never joins.
 		view.voice_available = false;
 		state.voice.active = None;
-		let (_, commands) = click(&mut view, &mut state, "Quiet room", 2);
+		let commands = click(&mut view, &mut state, "Quiet room", 2);
 		assert!(commands.is_empty() && view.voice_switch.is_none());
 
 		view.voice_available = true;
-		let (_, commands) = click(&mut view, &mut state, "Quiet room", 2);
+		let commands = click(&mut view, &mut state, "Quiet room", 2);
+		assert_eq!(state.selected, Some(Id(26)));
 		assert!(matches!(
 			commands.as_slice(),
 			[client_core::Command::Voice(
